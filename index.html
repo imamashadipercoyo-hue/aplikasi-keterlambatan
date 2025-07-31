@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Pencatatan Keterlambatan Siswa - SMK Negeri 1 Jember</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/isoWeek.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .tab-active {
+            border-bottom: 2px solid #3b82f6;
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        /* Modal styles */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-active {
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        .modal-content {
+            transition: transform 0.25s ease;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Logo upload styles */
+        .logo-container {
+            position: relative;
+        }
+        .logo-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0,0,0,0.5);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            cursor: pointer;
+            border-radius: 0.5rem;
+        }
+        .logo-container:hover .logo-overlay {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-20">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div class="logo-container">
+                    <img id="school-logo" src="https://placehold.co/64x64/ffffff/3b82f6?text=SMK" alt="Logo Sekolah" class="h-16 w-16 object-cover rounded-md bg-white p-1">
+                    <label for="logo-upload" class="logo-overlay">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    </label>
+                    <input type="file" id="logo-upload" class="hidden" accept="image/png, image/jpeg, image/gif">
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold">SMK NEGERI 1 JEMBER</h1>
+                    <p class="text-sm">Sistem Pencatatan Keterlambatan Siswa</p>
+                </div>
+            </div>
+            <div class="text-right">
+                <p id="current-date" class="text-lg font-semibold"></p>
+                <p id="current-time" class="text-2xl font-bold"></p>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Status Bar -->
+    <div class="container mx-auto mt-4">
+        <div id="status-bar" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md flex items-center gap-4">
+            <svg class="w-6 h-6 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <span id="status-text">Menghubungkan ke Google Sheets...</span>
+        </div>
+    </div>
+
+
+    <!-- Main Content -->
+    <main class="container mx-auto mt-4 p-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Column: Input Form -->
+            <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md self-start">
+                <h2 class="text-xl font-bold mb-6 border-b pb-2">Input Data Keterlambatan</h2>
+                <form id="late-form" class="space-y-4">
+                    <!-- Form inputs remain the same -->
+                    <div>
+                        <label for="nis" class="block text-sm font-medium text-gray-700">NIS</label>
+                        <input type="text" id="nis" name="nis" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                    </div>
+                    <div>
+                        <label for="student-name" class="block text-sm font-medium text-gray-700">Nama Siswa</label>
+                        <input type="text" id="student-name" name="student-name" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                    </div>
+                    <div>
+                        <label for="class" class="block text-sm font-medium text-gray-700">Kelas</label>
+                        <input type="text" id="class" name="class" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                    </div>
+                    <div>
+                        <label for="arrival-time" class="block text-sm font-medium text-gray-700">Waktu Kedatangan</label>
+                        <div class="mt-1 flex rounded-md shadow-sm">
+                            <input type="time" id="arrival-time" name="arrival-time" class="block w-full px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                            <button type="button" id="now-button" class="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 bg-gray-50 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-r-md">
+                                Sekarang
+                            </button>
+                        </div>
+                    </div>
+                     <div>
+                        <label for="reason" class="block text-sm font-medium text-gray-700">Alasan Keterlambatan</label>
+                        <select id="reason" name="reason" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                            <option value="">-- Pilih Alasan --</option>
+                            <option value="Bangun Kesiangan">Bangun Kesiangan</option>
+                            <option value="Kendaraan Rusak">Kendaraan Rusak</option>
+                            <option value="Macet di Jalan">Macet di Jalan</option>
+                            <option value="Hujan">Hujan</option>
+                            <option value="Lainnya">Lainnya</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="notes" class="block text-sm font-medium text-gray-700">Catatan Tambahan</label>
+                        <textarea id="notes" name="notes" rows="3" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                    </div>
+                    <div>
+                        <button type="submit" id="submit-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center">
+                            Simpan Data
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Right Column: Data Display -->
+            <div class="lg:col-span-2 space-y-8">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <!-- Tabs -->
+                    <div class="border-b border-gray-200">
+                        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                            <button class="tab-btn tab-active py-4 px-1 border-b-2 font-medium text-sm" data-tab="harian">Harian</button>
+                            <button class="tab-btn text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 border-b-2 font-medium text-sm" data-tab="mingguan">Mingguan</button>
+                            <button class="tab-btn text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 border-b-2 font-medium text-sm" data-tab="bulanan">Bulanan</button>
+                        </nav>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <div id="tab-content" class="mt-6">
+                        <!-- Daily Report -->
+                        <div id="harian-content">
+                             <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                                <div class="flex items-center gap-4">
+                                     <input type="date" id="filter-date" class="border border-gray-300 rounded-md p-2">
+                                     <button id="apply-filter" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Tampilkan</button>
+                                </div>
+                            </div>
+                            
+                            <h3 class="text-lg font-bold mb-2">Data Keterlambatan Harian</h3>
+                            <p class="text-sm text-gray-600 mb-4">Total: <span id="total-late-today">0</span> siswa</p>
+                            
+                            <div id="table-loader" class="text-center py-10 hidden"><div class="loader inline-block"></div><p class="mt-2 text-gray-500">Memuat data...</p></div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full bg-white">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama & Kelas</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waktu</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alasan</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="late-table-body" class="bg-white divide-y divide-gray-200">
+                                        <!-- Data rows will be inserted here by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Weekly/Monthly Reports -->
+                        <div id="mingguan-content" class="hidden">
+                             <h3 class="text-lg font-bold mb-4">Rekap Keterlambatan Mingguan</h3>
+                            <button id="generate-weekly-summary" class="mb-4 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center">
+                                ✨ Buat Ringkasan AI Mingguan
+                            </button>
+                            <div id="weekly-summary-content" class="p-4 bg-gray-50 rounded-md border text-gray-700 min-h-[100px]">
+                                Klik tombol untuk membuat ringkasan mingguan menggunakan AI.
+                            </div>
+                        </div>
+                        <div id="bulanan-content" class="hidden">
+                             <h3 class="text-lg font-bold mb-4">Rekap Keterlambatan Bulanan</h3>
+                             <button id="generate-monthly-summary" class="mb-4 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center">
+                                ✨ Buat Ringkasan AI Bulanan
+                            </button>
+                            <div id="monthly-summary-content" class="p-4 bg-gray-50 rounded-md border text-gray-700 min-h-[100px]">
+                                Klik tombol untuk membuat ringkasan bulanan menggunakan AI.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts remain the same -->
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-lg font-bold mb-4">Alasan Keterlambatan (Harian)</h3>
+                        <canvas id="reasons-chart"></canvas>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-lg font-bold mb-4">Tren Keterlambatan (7 Hari Terakhir)</h3>
+                         <canvas id="trend-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- AI Suggestion Modal -->
+    <div id="ai-modal" class="modal pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-30">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-0"></div>
+        <div id="modal-content-wrapper" class="modal-content transform -translate-y-full max-w-lg mx-auto p-4 z-50 w-full">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-start">
+                    <h2 class="text-xl font-bold text-gray-800">✨ Saran Tindak Lanjut dari AI</h2>
+                    <button id="modal-close-button" class="text-gray-500 hover:text-gray-800">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div id="modal-body" class="mt-4 text-gray-700 prose">
+                    <!-- AI content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="text-center py-4 mt-8">
+        <p class="text-sm text-gray-600">Dibuat oleh imamashadi 2025</p>
+    </footer>
+
+    <script>
+        dayjs.extend(window.dayjs_plugin_customParseFormat);
+        dayjs.extend(window.dayjs_plugin_isoWeek);
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // =================================================================================
+            // PENGATURAN - WAJIB DIISI
+            // =================================================================================
+            // Ganti dengan URL Web App dari Google Apps Script Anda setelah di-deploy
+            const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbws1-xlA6ppap3a_Gfb1aui9LNlHJ8B47XGyfhhfpG_EfJnpli6J6lplkBPabLycIvj/exec";
+            // =================================================================================
+
+            // Global state
+            let allLateData = [];
+
+            // --- Element References ---
+            const schoolLogo = document.getElementById('school-logo');
+            const logoUpload = document.getElementById('logo-upload');
+            const currentDateEl = document.getElementById('current-date');
+            const currentTimeEl = document.getElementById('current-time');
+            const nowButton = document.getElementById('now-button');
+            const arrivalTimeInput = document.getElementById('arrival-time');
+            const lateForm = document.getElementById('late-form');
+            const submitButton = document.getElementById('submit-button');
+            const lateTableBody = document.getElementById('late-table-body');
+            const totalLateTodayEl = document.getElementById('total-late-today');
+            const filterDateInput = document.getElementById('filter-date');
+            const applyFilterBtn = document.getElementById('apply-filter');
+            const tableLoader = document.getElementById('table-loader');
+            const statusBar = document.getElementById('status-bar');
+            const statusText = document.getElementById('status-text');
+            
+            // Modal elements
+            const modal = document.getElementById('ai-modal');
+            const modalContentWrapper = document.getElementById('modal-content-wrapper');
+            const modalBody = document.getElementById('modal-body');
+            const modalCloseButton = document.getElementById('modal-close-button');
+            
+            // Summary elements
+            const weeklySummaryBtn = document.getElementById('generate-weekly-summary');
+            const weeklySummaryContent = document.getElementById('weekly-summary-content');
+            const monthlySummaryBtn = document.getElementById('generate-monthly-summary');
+            const monthlySummaryContent = document.getElementById('monthly-summary-content');
+
+            // Charts
+            let reasonsChartInstance, trendChartInstance;
+
+            // --- Logo Functions ---
+            function loadLogo() {
+                const savedLogo = localStorage.getItem('schoolLogo');
+                if (savedLogo) {
+                    schoolLogo.src = savedLogo;
+                }
+            }
+
+            function handleLogoUpload(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const imageUrl = e.target.result;
+                        schoolLogo.src = imageUrl;
+                        localStorage.setItem('schoolLogo', imageUrl);
+                    }
+                    reader.readAsDataURL(file);
+                }
+            }
+            logoUpload.addEventListener('change', handleLogoUpload);
+
+            // --- Clock and Date ---
+            function updateClock() {
+                const now = dayjs();
+                currentDateEl.textContent = now.format('dddd, D MMMM YYYY');
+                currentTimeEl.textContent = now.format('HH:mm:ss');
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+
+            // --- Initial Setup ---
+            filterDateInput.value = dayjs().format('YYYY-MM-DD');
+            loadLogo(); // Load logo on start
+
+            // --- Google Sheets API Functions ---
+            async function fetchDataFromSheet() {
+                if (SCRIPT_URL === "MASUKKAN_URL_GOOGLE_APPS_SCRIPT_ANDA_DI_SINI") {
+                    updateStatus("error", "URL Google Apps Script belum diatur. Silakan edit file HTML.");
+                    return;
+                }
+                showTableLoader(true);
+                updateStatus("loading", "Mengambil data dari Google Sheets...");
+                try {
+                    const response = await fetch(SCRIPT_URL);
+                    if (!response.ok) throw new Error("Gagal mengambil data dari server.");
+                    const data = await response.json();
+                    allLateData = data;
+                    updateDashboard();
+                    updateStatus("success", `Data berhasil dimuat. Terakhir diperbarui: ${dayjs().format('HH:mm:ss')}`);
+                } catch (error) {
+                    console.error("Fetch Error:", error);
+                    updateStatus("error", "Gagal terhubung ke Google Sheets. Periksa URL dan izin skrip.");
+                } finally {
+                    showTableLoader(false);
+                }
+            }
+
+            async function addDataToSheet(entry) {
+                submitButton.disabled = true;
+                submitButton.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24" fill="currentColor"><path d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z"></path></svg> Menyimpan...`;
+                try {
+                    const response = await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'add', data: entry })
+                    });
+                    if (!response.ok) throw new Error("Gagal menyimpan data.");
+                    await response.json(); // Wait for confirmation
+                    lateForm.reset();
+                    arrivalTimeInput.value = '';
+                    alert('Data berhasil disimpan ke Google Sheets!');
+                    fetchDataFromSheet(); // Refresh data
+                } catch (error) {
+                    console.error("Add Error:", error);
+                    alert('Gagal menyimpan data. Coba lagi.');
+                } finally {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = `Simpan Data`;
+                }
+            }
+            
+            async function deleteDataFromSheet(rowId) {
+                if (!confirm('Apakah Anda yakin ingin menghapus data ini dari Google Sheets?')) return;
+                try {
+                    const response = await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'delete', rowId: rowId })
+                    });
+                    if (!response.ok) throw new Error("Gagal menghapus data.");
+                    await response.json();
+                    alert('Data berhasil dihapus.');
+                    fetchDataFromSheet(); // Refresh data
+                } catch (error) {
+                    console.error("Delete Error:", error);
+                    alert('Gagal menghapus data. Coba lagi.');
+                }
+            }
+
+            // --- Gemini API Function ---
+            async function callGeminiAPI(prompt, elementToUpdate) {
+                const apiKey = ""; // Handled by environment
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                
+                elementToUpdate.innerHTML = `<div class="flex items-center gap-2 text-gray-500"><div class="loader !w-5 !h-5"></div><span>AI sedang berpikir...</span></div>`;
+
+                try {
+                    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+                    const result = await response.json();
+                    if (result.candidates && result.candidates[0].content.parts[0].text) {
+                        elementToUpdate.innerHTML = result.candidates[0].content.parts[0].text.replace(/\n/g, '<br>');
+                    } else {
+                        elementToUpdate.textContent = "Tidak ada respons dari AI. Coba lagi.";
+                    }
+                } catch (error) {
+                    console.error("Error calling Gemini API:", error);
+                    elementToUpdate.textContent = "Terjadi kesalahan saat menghubungi AI.";
+                }
+            }
+
+            // --- UI Functions ---
+            function showTableLoader(isLoading) {
+                tableLoader.classList.toggle('hidden', !isLoading);
+            }
+
+            function updateStatus(type, message) {
+                statusBar.className = 'p-4 rounded-md flex items-center gap-4 ';
+                const icon = statusBar.querySelector('svg');
+                icon.style.display = 'block';
+
+                if (type === 'success') {
+                    statusBar.classList.add('bg-green-100', 'border-l-4', 'border-green-500', 'text-green-700');
+                    icon.style.display = 'none'; // Hide spinner on success
+                } else if (type === 'error') {
+                    statusBar.classList.add('bg-red-100', 'border-l-4', 'border-red-500', 'text-red-700');
+                    icon.style.display = 'none';
+                } else { // loading
+                    statusBar.classList.add('bg-yellow-100', 'border-l-4', 'border-yellow-500', 'text-yellow-700');
+                    icon.classList.add('animate-spin');
+                }
+                statusText.textContent = message;
+            }
+
+            function renderTable(dataToRender) {
+                lateTableBody.innerHTML = '';
+                if (dataToRender.length === 0) {
+                    lateTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-10 text-gray-500">Tidak ada data untuk tanggal yang dipilih</td></tr>';
+                    return;
+                }
+
+                dataToRender.forEach((item) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-4 py-4 whitespace-nowrap">
+                            <div class="text-sm font-semibold text-gray-900">${item.name}</div>
+                            <div class="text-sm text-gray-500">${item.class}</div>
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${dayjs(item.date).format('DD/MM/YY')} ${item.time}</td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${item.reason}</td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            <button class="generate-suggestion-btn bg-blue-100 text-blue-800 hover:bg-blue-200 px-3 py-1 rounded-md text-xs" data-id="${item.id}">✨ Saran</button>
+                            <button class="delete-btn text-red-600 hover:text-red-900" data-id="${item.id}">Hapus</button>
+                        </td>
+                    `;
+                    lateTableBody.appendChild(row);
+                });
+            }
+            
+            function updateDashboard() {
+                const selectedDate = filterDateInput.value;
+                const filteredData = allLateData.filter(d => d.date === selectedDate);
+                
+                renderTable(filteredData);
+                totalLateTodayEl.textContent = `${filteredData.length}`;
+                updateCharts(filteredData);
+                updateTrendChart();
+            }
+            
+            function updateCharts(dailyData) {
+                // Reasons Chart
+                const reasonCounts = dailyData.reduce((acc, item) => {
+                    acc[item.reason] = (acc[item.reason] || 0) + 1;
+                    return acc;
+                }, {});
+
+                if (reasonsChartInstance) reasonsChartInstance.destroy();
+                const reasonsCtx = document.getElementById('reasons-chart').getContext('2d');
+                reasonsChartInstance = new Chart(reasonsCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(reasonCounts),
+                        datasets: [{ data: Object.values(reasonCounts), backgroundColor: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6'], borderWidth: 2, borderColor: '#fff' }]
+                    },
+                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                });
+            }
+            
+            function updateTrendChart() {
+                // Trend Chart for last 7 days
+                const trendData = {};
+                for (let i = 6; i >= 0; i--) {
+                    const date = dayjs().subtract(i, 'day').format('YYYY-MM-DD');
+                    trendData[date] = 0;
+                }
+                allLateData.forEach(item => {
+                    if (trendData[item.date] !== undefined) {
+                        trendData[item.date]++;
+                    }
+                });
+                
+                if (trendChartInstance) trendChartInstance.destroy();
+                const trendCtx = document.getElementById('trend-chart').getContext('2d');
+                trendChartInstance = new Chart(trendCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(trendData).map(d => dayjs(d).format('DD MMM')),
+                        datasets: [{ label: 'Jumlah Keterlambatan', data: Object.values(trendData), backgroundColor: 'rgba(54, 162, 235, 0.5)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 }]
+                    },
+                    options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true }
+                });
+            }
+
+            // --- Event Listeners ---
+            nowButton.addEventListener('click', () => {
+                arrivalTimeInput.value = dayjs().format('HH:mm');
+            });
+
+            lateForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                const newEntry = {
+                    id: `ID-${Date.now()}`, // Unique ID
+                    nis: formData.get('nis'),
+                    name: formData.get('student-name'),
+                    class: formData.get('class'),
+                    date: dayjs().format('YYYY-MM-DD'),
+                    time: formData.get('arrival-time'),
+                    reason: formData.get('reason'),
+                    notes: formData.get('notes'),
+                };
+                addDataToSheet(newEntry);
+            });
+            
+            lateTableBody.addEventListener('click', function(e) {
+                const target = e.target;
+                if (target.classList.contains('delete-btn')) {
+                    const idToDelete = target.dataset.id;
+                    deleteDataFromSheet(idToDelete);
+                }
+                if (target.classList.contains('generate-suggestion-btn')) {
+                    const id = target.dataset.id;
+                    const studentData = allLateData.find(item => item.id === id);
+                    if (studentData) {
+                        const prompt = `Seorang siswa bernama ${studentData.name} dari kelas ${studentData.class} terlambat dengan alasan "${studentData.reason}". Catatan tambahan: "${studentData.notes || 'tidak ada'}". Berikan 3 saran tindak lanjut yang konkret dan profesional untuk guru dalam format daftar bernomor.`;
+                        modalBody.innerHTML = 'Memuat saran...';
+                        openModal();
+                        callGeminiAPI(prompt, modalBody);
+                    }
+                }
+            });
+
+            applyFilterBtn.addEventListener('click', updateDashboard);
+            
+            // Modal listeners
+            modalCloseButton.addEventListener('click', closeModal);
+            modal.querySelector('.modal-overlay').addEventListener('click', closeModal);
+            function openModal() {
+                modal.classList.remove('pointer-events-none');
+                modal.querySelector('.modal-overlay').classList.add('opacity-50');
+                modalContentWrapper.classList.remove('-translate-y-full');
+            }
+            function closeModal() {
+                modal.querySelector('.modal-overlay').classList.remove('opacity-50');
+                modalContentWrapper.classList.add('-translate-y-full');
+                setTimeout(() => modal.classList.add('pointer-events-none'), 250);
+            }
+
+            // Summary listeners
+            weeklySummaryBtn.addEventListener('click', (e) => generateSummary('weekly', weeklySummaryContent, e.currentTarget));
+            monthlySummaryBtn.addEventListener('click', (e) => generateSummary('monthly', monthlySummaryContent, e.currentTarget));
+
+            function generateSummary(period, contentElement) {
+                let dataForSummary;
+                let periodText;
+                const today = dayjs();
+
+                if (period === 'weekly') {
+                    const startOfWeek = today.startOf('isoWeek').format('YYYY-MM-DD');
+                    const endOfWeek = today.endOf('isoWeek').format('YYYY-MM-DD');
+                    dataForSummary = allLateData.filter(d => d.date >= startOfWeek && d.date <= endOfWeek);
+                    periodText = `minggu ini (${startOfWeek} sampai ${endOfWeek})`;
+                } else { // monthly
+                    const startOfMonth = today.startOf('month').format('YYYY-MM-DD');
+                    const endOfMonth = today.endOf('month').format('YYYY-MM-DD');
+                    dataForSummary = allLateData.filter(d => d.date >= startOfMonth && d.date <= endOfMonth);
+                    periodText = `bulan ini (${today.format('MMMM YYYY')})`;
+                }
+
+                if (dataForSummary.length === 0) {
+                    contentElement.textContent = `Tidak ada data keterlambatan untuk ${periodText}.`;
+                    return;
+                }
+
+                const dataString = dataForSummary.map(d => `${d.name} (${d.class}) terlambat pada ${d.date} karena ${d.reason}`).join('; ');
+                const prompt = `Analisis data keterlambatan siswa berikut untuk ${periodText}: "${dataString}". Buat ringkasan naratif yang menyoroti tren utama, alasan paling umum, dan berikan 2-3 rekomendasi strategis untuk sekolah. Gunakan format poin untuk rekomendasi.`;
+                callGeminiAPI(prompt, contentElement);
+            }
+
+            // Tab switching logic
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            const tabContents = {
+                harian: document.getElementById('harian-content'),
+                mingguan: document.getElementById('mingguan-content'),
+                bulanan: document.getElementById('bulanan-content'),
+            };
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    tabButtons.forEach(btn => btn.classList.remove('tab-active', 'text-blue-600', 'font-semibold'));
+                    Object.values(tabContents).forEach(content => content.classList.add('hidden'));
+                    button.classList.add('tab-active', 'text-blue-600', 'font-semibold');
+                    const tabName = button.dataset.tab;
+                    tabContents[tabName].classList.remove('hidden');
+                });
+            });
+
+            // Initial Load
+            fetchDataFromSheet();
+        });
+    </script>
+
+</body>
+</html>
